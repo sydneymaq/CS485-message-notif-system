@@ -1,15 +1,14 @@
-# CS485-message-notif-system
-Typhoon message notification system
+# Typhoon Message notification system
 
-##How to run the program
+## How to run the program
 
-# compile files first
+## compile files first
 javac TCPServer.java TCPClient.java
 
-# start server 
+## start server 
 java TCPServer
 
-# open seperate terminal and start client
+## open seperate terminal and start client
 java TCPClient
 
 
