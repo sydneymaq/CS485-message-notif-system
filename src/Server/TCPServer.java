@@ -1,4 +1,6 @@
-package Server;
+// receives message requests
+
+package server;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;

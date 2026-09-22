@@ -1,4 +1,6 @@
-package Client;
+//connects GUI to server
+
+package client;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
