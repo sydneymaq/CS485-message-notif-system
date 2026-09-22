@@ -2,13 +2,21 @@
 
 ## How to run the program
 
-## compile files first
-javac TCPServer.java TCPClient.java
+### create a file for compiled .class files: 
 
-## start server 
-java TCPServer
+Make sure your terminal is at : 
+CS485-message-notif-system %
 
-## open seperate terminal and start client
-java TCPClient
+Then use command: 
+- mkdir -p out
+- javac -d out src/server/TCPServer.java src/client/TCPClient.java
+
+### run
+use command: java -cp out server.TCPServer
+
+### create new terminal
+
+create new terminal then run: java -cp out client.TCPClient
+
 
 
