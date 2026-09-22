@@ -1,6 +1,6 @@
 // determines how messages should be delivered
 
-package Service;
+package service;
 
 public class MessageService {
     
