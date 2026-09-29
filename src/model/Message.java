@@ -1,4 +1,4 @@
-// Stores phone number, message, and delivery 
+// Stores phone number, message, and delivery for API
 
 package model;
 

@@ -46,7 +46,7 @@ public class Main {
 
         System.out.println("Program closed.");
     }
-
+    ///GUI display
     private static void printHeader() {
         System.out.println();
         System.out.println("==============================================");
@@ -55,7 +55,7 @@ public class Main {
         System.out.println("Client address: 127.0.0.1");
         System.out.println("Server port: 65432");
     }
-
+    // main menu options that come up after starting Client.main
     private static void printMenu() {
         System.out.println();
         System.out.println("----------------------------------------------");
