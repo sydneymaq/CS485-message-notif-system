@@ -9,14 +9,14 @@ CS485-message-notif-system %
 
 Then use command: 
 - mkdir -p out
-- javac -d out src/server/TCPServer.java src/client/TCPClient.java
+- javac -d out src/server/TCPServer.java src/client/TCPClient.java src/client/Main.java
 
 ### run
 use command: java -cp out server.TCPServer
 
 ### create new terminal
 
-create new terminal then run: java -cp out client.TCPClient
+create new terminal then run: java -cp out client.Main
 
 
 
