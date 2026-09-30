@@ -13,7 +13,7 @@ This app is currently utilizing Meta's WhatsApp API.
 #### API version must include v (vXX.X)
 
 ### set javafx path
-- $env:JAVAFX_PATH="C:\path\to\javafx-sdk-21.0.10\lib"  make sure it is in ur java sdk
+- $env:JAVAFX_PATH="C:\path\to\javafx-sdk-21.0.10\lib"  change this path to mathc where ur javafx sdk is
 
 ### create output directories
 - New-Item -ItemType Directory -Force out
