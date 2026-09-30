@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Run JavaFX Client",
+            "request": "launch",
+            "mainClass": "client.Main",
+            "vmArgs": "--module-path "C:\\Users\\sydneyquintanilla\\Downloads\\javafx-sdk-27\\lib\\*.jar" --add-modules javafx.controls",
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "java",
+            "name": "Run TCP Server",
+            "request": "launch",
+            "mainClass": "server.TCPServer",
+            "console": "integratedTerminal",
+            "env": {
+                "VONAGE_API_KEY": "a3f45751",
+                "VONAGE_API_SECRET": "VuDajCyH50a4YA0Y",
+                "VONAGE_SANDBOX_NUMBER": "14157386102",
+                "VONAGE_SANDBOX_URL": "https://messages-sandbox.nexmo.com/v1/messages"
+            }
+        }
+    ]
+}
