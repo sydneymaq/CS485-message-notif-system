@@ -4,26 +4,31 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 
-public class WhatsAppService {
+public class VonageService {
 
-    private final String accessToken;
-    private final String phoneNumberId;
-    private final String apiVersion;
+    private final String apiKey;
+    private final String apiSecret;
+    private final String sandboxNumber;
+    private final String sandboxUrl;
 
     private final HttpClient httpClient;
 
-    public WhatsAppService() {
+    public VonageService() {
 
-        accessToken =
-                System.getenv("WHATSAPP_ACCESS_TOKEN");
+        apiKey = System.getenv("VONAGE_API_KEY");
 
-        phoneNumberId =
-                System.getenv("WHATSAPP_PHONE_NUMBER_ID");
+        apiSecret =
+                System.getenv("VONAGE_API_SECRET");
 
-        apiVersion =
-                System.getenv("WHATSAPP_API_VERSION");
+        sandboxNumber =
+                System.getenv("VONAGE_SANDBOX_NUMBER");
+
+        sandboxUrl =
+                System.getenv("VONAGE_SANDBOX_URL");
 
         httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
@@ -34,124 +39,106 @@ public class WhatsAppService {
 
     private void validateConfiguration() {
 
-        if (accessToken == null ||
-                accessToken.isBlank()) {
-
+        if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException(
-                "WHATSAPP_ACCESS_TOKEN is missing."
+                "VONAGE_API_KEY is missing."
             );
         }
 
-        if (phoneNumberId == null ||
-                phoneNumberId.isBlank()) {
+        if (apiSecret == null ||
+                apiSecret.isBlank()) {
 
             throw new IllegalStateException(
-                "WHATSAPP_PHONE_NUMBER_ID is missing."
+                "VONAGE_API_SECRET is missing."
             );
         }
 
-        if (apiVersion == null ||
-                apiVersion.isBlank()) {
+        if (sandboxNumber == null ||
+                sandboxNumber.isBlank()) {
 
             throw new IllegalStateException(
-                "WHATSAPP_API_VERSION is missing."
+                "VONAGE_SANDBOX_NUMBER is missing."
+            );
+        }
+
+        if (sandboxUrl == null ||
+                sandboxUrl.isBlank()) {
+
+            throw new IllegalStateException(
+                "VONAGE_SANDBOX_URL is missing."
             );
         }
     }
 
-    /*
-     * Use this method first.
-     *
-     * It sends Meta's built-in hello_world template.
-     * This is the safest way to test the API connection.
-     */
-    public DeliveryResult sendTestTemplate(
-            String recipientPhoneNumber
-    ) {
-
-        String cleanPhoneNumber =
-                cleanPhoneNumber(recipientPhoneNumber);
-
-        String jsonBody = """
-                {
-                  "messaging_product": "whatsapp",
-                  "recipient_type": "individual",
-                  "to": "%s",
-                  "type": "template",
-                  "template": {
-                    "name": "hello_world",
-                    "language": {
-                      "code": "en_US"
-                    }
-                  }
-                }
-                """.formatted(cleanPhoneNumber);
-
-        return sendApiRequest(jsonBody);
-    }
-
-    /*
-     * Use this method for custom messages.
-     *
-     * Meta may only allow custom text while the
-     * recipient has an active conversation window.
-     */
     public DeliveryResult sendMessage(
             String recipientPhoneNumber,
             String message
     ) {
 
-        String cleanPhoneNumber =
-                cleanPhoneNumber(recipientPhoneNumber);
-
-        String jsonBody = """
-                {
-                  "messaging_product": "whatsapp",
-                  "recipient_type": "individual",
-                  "to": "%s",
-                  "type": "text",
-                  "text": {
-                    "preview_url": false,
-                    "body": "%s"
-                  }
-                }
-                """.formatted(
-                    escapeJson(cleanPhoneNumber),
-                    escapeJson(message)
-                );
-
-        return sendApiRequest(jsonBody);
-    }
-
-    private DeliveryResult sendApiRequest(
-            String jsonBody
-    ) {
-
         try {
-            String endpoint =
-                    "https://graph.facebook.com/" +
-                    apiVersion + "/" +
-                    phoneNumberId +
-                    "/messages";
+            String cleanRecipient =
+                    cleanPhoneNumber(
+                        recipientPhoneNumber
+                    );
+
+            String cleanSender =
+                    cleanPhoneNumber(
+                        sandboxNumber
+                    );
+
+            String jsonBody = """
+                    {
+                      "to": "%s",
+                      "from": "%s",
+                      "channel": "whatsapp",
+                      "message_type": "text",
+                      "text": "%s"
+                    }
+                    """.formatted(
+                        escapeJson(cleanRecipient),
+                        escapeJson(cleanSender),
+                        escapeJson(message)
+                    );
+
+            String credentials =
+                    apiKey + ":" + apiSecret;
+
+            String basicAuthentication =
+                    Base64.getEncoder()
+                            .encodeToString(
+                                credentials.getBytes(
+                                    StandardCharsets.UTF_8
+                                )
+                            );
 
             HttpRequest request =
                     HttpRequest.newBuilder()
-                            .uri(URI.create(endpoint))
+                            .uri(
+                                URI.create(sandboxUrl)
+                            )
                             .timeout(
                                 Duration.ofSeconds(30)
                             )
                             .header(
                                 "Authorization",
-                                "Bearer " + accessToken
+                                "Basic " +
+                                basicAuthentication
                             )
                             .header(
                                 "Content-Type",
                                 "application/json"
                             )
+                            .header(
+                                "Accept",
+                                "application/json"
+                            )
                             .POST(
                                 HttpRequest
                                     .BodyPublishers
-                                    .ofString(jsonBody)
+                                    .ofString(
+                                        jsonBody,
+                                        StandardCharsets.UTF_8
+                                    )
                             )
                             .build();
 
@@ -174,7 +161,7 @@ public class WhatsAppService {
 
                 return new DeliveryResult(
                     true,
-                    "WhatsApp accepted the message.",
+                    "Vonage accepted the WhatsApp message.",
                     statusCode,
                     responseBody
                 );
@@ -182,7 +169,7 @@ public class WhatsAppService {
 
             return new DeliveryResult(
                 false,
-                "WhatsApp rejected the message.",
+                "Vonage rejected the WhatsApp message.",
                 statusCode,
                 responseBody
             );
@@ -193,7 +180,7 @@ public class WhatsAppService {
 
             return new DeliveryResult(
                 false,
-                "The API request was interrupted.",
+                "The Vonage request was interrupted.",
                 0,
                 e.getMessage()
             );
@@ -202,8 +189,8 @@ public class WhatsAppService {
 
             return new DeliveryResult(
                 false,
-                "Could not contact WhatsApp: " +
-                    e.getMessage(),
+                "Could not contact Vonage: " +
+                e.getMessage(),
                 0,
                 e.toString()
             );
@@ -213,6 +200,7 @@ public class WhatsAppService {
     private String cleanPhoneNumber(
             String phoneNumber
     ) {
+
         /*
          * Converts:
          * +1 671 555 1234
@@ -227,6 +215,10 @@ public class WhatsAppService {
     }
 
     private String escapeJson(String value) {
+
+        if (value == null) {
+            return "";
+        }
 
         return value
                 .replace("\\", "\\\\")

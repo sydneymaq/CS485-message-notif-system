@@ -16,7 +16,15 @@ public class TCPServer {
     public static void main(String[] args) {
 
         System.out.println(
-            "[SERVER] Starting notification server..."
+            "========================================"
+        );
+
+        System.out.println(
+            "     MESSAGE NOTIFICATION SERVER"
+        );
+
+        System.out.println(
+            "========================================"
         );
 
         try (
@@ -24,10 +32,12 @@ public class TCPServer {
                     new ServerSocket(PORT)
         ) {
             System.out.println(
-                "[SERVER] Listening on port " + PORT
+                "[SERVER] Listening on port " +
+                PORT + "..."
             );
 
             while (true) {
+
                 Socket clientSocket =
                         serverSocket.accept();
 
@@ -35,6 +45,7 @@ public class TCPServer {
             }
 
         } catch (Exception e) {
+
             System.err.println(
                 "[SERVER] Fatal error: " +
                 e.getMessage()
@@ -47,9 +58,13 @@ public class TCPServer {
     private static void handleClient(
             Socket clientSocket
     ) {
+
+        System.out.println();
+
         System.out.println(
             "[SERVER] Client connected: " +
-            clientSocket.getRemoteSocketAddress()
+            clientSocket
+                .getRemoteSocketAddress()
         );
 
         try (
@@ -77,6 +92,7 @@ public class TCPServer {
             output.println(response);
 
         } catch (Exception e) {
+
             System.err.println(
                 "[SERVER] Client error: " +
                 e.getMessage()
@@ -86,16 +102,24 @@ public class TCPServer {
         System.out.println(
             "[SERVER] Client disconnected."
         );
+
+        System.out.println(
+            "[SERVER] Waiting for another client..."
+        );
     }
 
     private static String processRequest(
             String request
     ) {
-        if (request == null || request.isBlank()) {
+
+        if (request == null ||
+                request.isBlank()) {
+
             return "ERROR: Empty request received.";
         }
 
-        String[] parts = request.split("\\|", 3);
+        String[] parts =
+                request.split("\\|", 3);
 
         if (parts.length != 3) {
             return "ERROR: Invalid request format.";
@@ -113,7 +137,7 @@ public class TCPServer {
         if (!deliveryMethod.equalsIgnoreCase(
                 "WHATSAPP"
         )) {
-            return "ERROR: Only WhatsApp is currently available.";
+            return "ERROR: Only WhatsApp is available.";
         }
 
         if (!phoneNumber.matches(
@@ -125,16 +149,19 @@ public class TCPServer {
         String message;
 
         try {
-            byte[] decodedMessage =
+            byte[] decodedBytes =
                     Base64.getDecoder()
-                            .decode(encodedMessage);
+                            .decode(
+                                encodedMessage
+                            );
 
             message = new String(
-                decodedMessage,
+                decodedBytes,
                 StandardCharsets.UTF_8
             ).trim();
 
         } catch (IllegalArgumentException e) {
+
             return "ERROR: Invalid message encoding.";
         }
 
@@ -142,66 +169,120 @@ public class TCPServer {
             return "ERROR: Message cannot be empty.";
         }
 
-        System.out.println();
-        System.out.println("NEW NOTIFICATION");
-        System.out.println("--------------------------------");
-        System.out.println(
-            "Time: " + LocalDateTime.now()
-        );
-        System.out.println(
-            "Method: " + deliveryMethod
-        );
-        System.out.println(
-            "Recipient: " + phoneNumber
-        );
-        System.out.println("Message:");
-        System.out.println(message);
-        System.out.println("--------------------------------");
+        if (message.length() > 4096) {
+            return "ERROR: WhatsApp messages cannot " +
+                   "exceed 4,096 characters.";
+        }
 
-        return sendThroughWhatsApp(
+        displayNotification(
+            phoneNumber,
+            deliveryMethod,
+            message
+        );
+
+        return sendThroughVonage(
             phoneNumber,
             message
         );
     }
 
-    private static String sendThroughWhatsApp(
+    private static void displayNotification(
+            String phoneNumber,
+            String deliveryMethod,
+            String message
+    ) {
+
+        System.out.println();
+
+        System.out.println(
+            "INCOMING NOTIFICATION"
+        );
+
+        System.out.println(
+            "----------------------------------------"
+        );
+
+        System.out.println(
+            "Received: " +
+            LocalDateTime.now()
+        );
+
+        System.out.println(
+            "Recipient: " +
+            phoneNumber
+        );
+
+        System.out.println(
+            "Method: " +
+            deliveryMethod
+        );
+
+        System.out.println();
+
+        System.out.println("Message:");
+
+        System.out.println(message);
+
+        System.out.println(
+            "----------------------------------------"
+        );
+    }
+
+    private static String sendThroughVonage(
             String phoneNumber,
             String message
     ) {
-        try {
-            WhatsAppService service =
-                    new WhatsAppService();
 
-           /* WhatsAppService.DeliveryResult result =
+        try {
+            VonageService service =
+                    new VonageService();
+
+            VonageService.DeliveryResult result =
                     service.sendMessage(
                         phoneNumber,
                         message
                     );
-            */
-           WhatsAppService.DeliveryResult result =
-                 service.sendTestTemplate(
-                     phoneNumber
-                );
+
+            System.out.println();
+
             System.out.println(
-                "[WHATSAPP] Status code: " +
+                "[VONAGE] HTTP status: " +
                 result.getStatusCode()
             );
 
             System.out.println(
-                "[WHATSAPP] Provider response: " +
+                "[VONAGE] Result: " +
+                result.getMessage()
+            );
+
+            System.out.println(
+                "[VONAGE] Provider response: " +
                 result.getProviderResponse()
             );
 
             if (result.isSuccessful()) {
-                return "SUCCESS: WhatsApp message accepted for "
-                        + phoneNumber + ".";
+
+                return "SUCCESS: WhatsApp message " +
+                       "accepted for " +
+                       phoneNumber + ".";
             }
 
-            return "ERROR: " + result.getMessage() + " Provider response: "+ result.getProviderResponse();
+            return "ERROR: " +
+                    result.getMessage() +
+                    " HTTP status " +
+                    result.getStatusCode() +
+                    ".";
 
         } catch (IllegalStateException e) {
-            return "ERROR: Server API configuration is missing. "
-                    + e.getMessage();
+
+            System.err.println(
+                "[VONAGE] Configuration error: " +
+                e.getMessage()
+            );
+
+            return "ERROR: Server configuration " +
+                   "is incomplete. " +
+                   e.getMessage();
         }
     }
 }

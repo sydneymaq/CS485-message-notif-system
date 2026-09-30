@@ -1,34 +1,40 @@
 # Typhoon Message notification system
 
-This app is currently utilizing Meta's WhatsApp API.
+This app is currently utilizing Vonage's sandbox API.
 
 ## How to run the program
 
-### In PowerShell enter:
+### Set credentials in Powershell:
+- $env:VONAGE_API_KEY="PASTE_YOUR_API_KEY"
+- $env:VONAGE_API_SECRET="PASTE_YOUR_API_SECRET"
+- $env:VONAGE_SANDBOX_NUMBER="PASTE_THE_SANDBOX_WHATSAPP_NUMBER"
 
-- $env:WHATSAPP_ACCESS_TOKEN="PASTE_YOUR_TOKEN_HERE"
-- $env:WHATSAPP_PHONE_NUMBER_ID="PASTE_YOUR_PHONE_NUMBER_ID_HERE"
-- $env:WHATSAPP_API_VERSION="PASTE_META_API_VERSION_HERE"
+### Set sandbox endpoint
+- $env:VONAGE_SANDBOX_URL="https://messages-sandbox.nexmo.com/v1/messages" * make sure it is same as URL in sandbox page
 
-#### API version must include v (vXX.X)
+### confirm nonsecret values
+- $env:VONAGE_API_KEY
+- $env:VONAGE_SANDBOX_NUMBER
+- $env:VONAGE_SANDBOX_URL
 
-### set javafx path
-- $env:JAVAFX_PATH="C:\path\to\javafx-sdk-21.0.10\lib"  change this path to mathc where ur javafx sdk is
+## Make new powershell terminal
+Set path to JavaFX SDK : 
+- $env:JAVAFX_PATH="C:\path\to\javafx-sdk-21.0.10\lib" * make sure it matches ur javafx sdk location
 
 ### create output directories
 - New-Item -ItemType Directory -Force out
 - New-Item -ItemType Directory -Force out\resources
 
 ### compile
-- javac --module-path "$env:JAVAFX_PATH" --add-modules javafx.controls -d out src\client\Main.java src\client\TCPClient.java src\server\TCPServer.java src\server\WhatsAppService.java
+- javac --module-path "$env:JAVAFX_PATH" --add-modules javafx.controls -d out src\client\Main.java src\client\TCPClient.java src\server\TCPServer.java src\server\VonageService.java
 
 ### copy css
 - Copy-Item src\resources\javafx.css out\resources\javafx.css -Force
 
-### start server
+### Go back to Terminal with Credentials and start server
 - java -cp out server.TCPServer
 
-### start JavaFX
+### Open second terminal and start JavaFX:
 - $env:JAVAFX_PATH="C:\path\to\javafx-sdk-21.0.10\lib"
 
 
