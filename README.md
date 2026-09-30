@@ -1,6 +1,6 @@
 # Typhoon Message notification system
 
-This app i scurrently utilizing Meta's WhatsApp API.
+This app is currently utilizing Meta's WhatsApp API.
 
 ## How to run the program
 
@@ -12,6 +12,26 @@ This app i scurrently utilizing Meta's WhatsApp API.
 
 #### API version must include v (vXX.X)
 
+### set javafx path
+- $env:JAVAFX_PATH="C:\path\to\javafx-sdk-21.0.10\lib"  make sure it is in ur java sdk
+
+### create output directories
+- New-Item -ItemType Directory -Force out
+- New-Item -ItemType Directory -Force out\resources
+
+### compile
+- javac --module-path "$env:JAVAFX_PATH" --add-modules javafx.controls -d out src\client\Main.java src\client\TCPClient.java src\server\TCPServer.java src\server\WhatsAppService.java
+
+### copy css
+- Copy-Item src\resources\javafx.css out\resources\javafx.css -Force
+
+### start server
+- java -cp out server.TCPServer
+
+### start JavaFX
+- $env:JAVAFX_PATH="C:\path\to\javafx-sdk-21.0.10\lib"
 
 
+## Run:
+- java --module-path "$env:JAVAFX_PATH" --add-modules javafx.controls -cp out client.Main
 
