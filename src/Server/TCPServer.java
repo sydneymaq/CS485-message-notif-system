@@ -1,5 +1,3 @@
-// receives message requests
-
 package server;
 
 import java.io.BufferedReader;
@@ -9,7 +7,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 
 public class TCPServer {
@@ -18,192 +15,193 @@ public class TCPServer {
 
     public static void main(String[] args) {
 
-        System.out.println("==============================================");
-        System.out.println("       MESSAGE NOTIFICATION SERVER");
-        System.out.println("==============================================");
+        System.out.println(
+            "[SERVER] Starting notification server..."
+        );
 
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-
+        try (
+            ServerSocket serverSocket =
+                    new ServerSocket(PORT)
+        ) {
             System.out.println(
-                "[SERVER] Listening on port " + PORT + "..."
+                "[SERVER] Listening on port " + PORT
             );
 
-            /*
-             * The server remains running after a client disconnects.
-             * It returns to accept() and waits for another client.
-             */
             while (true) {
-                try {
-                    handleClient(serverSocket.accept());
-                } catch (Exception e) {
-                    System.err.println(
-                        "[SERVER] Client processing error: "
-                        + e.getMessage()
-                    );
-                }
+                Socket clientSocket =
+                        serverSocket.accept();
+
+                handleClient(clientSocket);
             }
 
         } catch (Exception e) {
             System.err.println(
-                "[SERVER] Could not start: " + e.getMessage()
+                "[SERVER] Fatal error: " +
+                e.getMessage()
             );
 
             e.printStackTrace();
         }
     }
 
-    private static void handleClient(Socket clientSocket) {
-
-        System.out.println();
+    private static void handleClient(
+            Socket clientSocket
+    ) {
         System.out.println(
-            "[SERVER] Client connected: "
-            + clientSocket.getRemoteSocketAddress()
+            "[SERVER] Client connected: " +
+            clientSocket.getRemoteSocketAddress()
         );
 
         try (
             Socket socket = clientSocket;
+
             BufferedReader input =
                     new BufferedReader(
-                        new InputStreamReader(socket.getInputStream())
+                        new InputStreamReader(
+                            socket.getInputStream(),
+                            StandardCharsets.UTF_8
+                        )
                     );
+
             PrintWriter output =
-                    new PrintWriter(socket.getOutputStream(), true)
+                    new PrintWriter(
+                        socket.getOutputStream(),
+                        true
+                    )
         ) {
             String request = input.readLine();
 
-            if (request == null || request.isBlank()) {
-                output.println(
-                    "ERROR: The server received an empty request."
-                );
-
-                return;
-            }
-
-            String response = processRequest(request);
+            String response =
+                    processRequest(request);
 
             output.println(response);
 
         } catch (Exception e) {
             System.err.println(
-                "[SERVER] Connection error: " + e.getMessage()
+                "[SERVER] Client error: " +
+                e.getMessage()
             );
         }
 
-        System.out.println("[SERVER] Client disconnected.");
-        System.out.println("[SERVER] Waiting for another client...");
+        System.out.println(
+            "[SERVER] Client disconnected."
+        );
     }
 
-    private static String processRequest(String request) {
+    private static String processRequest(
+            String request
+    ) {
+        if (request == null || request.isBlank()) {
+            return "ERROR: Empty request received.";
+        }
 
-        /*
-         * The limit of 3 prevents additional separators from
-         * creating unexpected fields.
-         */
         String[] parts = request.split("\\|", 3);
 
         if (parts.length != 3) {
             return "ERROR: Invalid request format.";
         }
 
-        String deliveryMethod = parts[0].trim();
-        String phoneNumber = parts[1].trim();
-        String encodedMessage = parts[2].trim();
+        String deliveryMethod =
+                parts[0].trim();
 
-        if (!isValidDeliveryMethod(deliveryMethod)) {
-            return "ERROR: Delivery method must be SMS or WHATSAPP.";
+        String phoneNumber =
+                parts[1].trim();
+
+        String encodedMessage =
+                parts[2].trim();
+
+        if (!deliveryMethod.equalsIgnoreCase(
+                "WHATSAPP"
+        )) {
+            return "ERROR: Only WhatsApp is currently available.";
         }
 
-        if (!isValidPhoneNumber(phoneNumber)) {
-            return "ERROR: The phone number is invalid.";
+        if (!phoneNumber.matches(
+                "[+]?[0-9() -]{7,20}"
+        )) {
+            return "ERROR: Invalid phone number.";
         }
 
         String message;
 
         try {
-            byte[] decodedBytes =
-                    Base64.getDecoder().decode(encodedMessage);
+            byte[] decodedMessage =
+                    Base64.getDecoder()
+                            .decode(encodedMessage);
 
             message = new String(
-                decodedBytes,
+                decodedMessage,
                 StandardCharsets.UTF_8
             ).trim();
 
         } catch (IllegalArgumentException e) {
-            return "ERROR: The message could not be decoded.";
+            return "ERROR: Invalid message encoding.";
         }
 
-        if (message.isEmpty()) {
-            return "ERROR: The message cannot be empty.";
+        if (message.isBlank()) {
+            return "ERROR: Message cannot be empty.";
         }
-
-        displayNotification(
-            phoneNumber,
-            deliveryMethod,
-            message
-        );
-
-        /*
-         * This is where a real SMS or WhatsApp API method
-         * will eventually be called.
-         */
-        boolean sentSuccessfully = simulateDelivery(
-            phoneNumber,
-            deliveryMethod,
-            message
-        );
-
-        if (!sentSuccessfully) {
-            return "ERROR: The notification could not be delivered.";
-        }
-
-        return "SUCCESS: " + deliveryMethod +
-               " notification processed for " + phoneNumber + ".";
-    }
-
-    private static boolean isValidDeliveryMethod(String method) {
-        return method.equalsIgnoreCase("SMS")
-                || method.equalsIgnoreCase("WHATSAPP");
-    }
-
-    private static boolean isValidPhoneNumber(String phoneNumber) {
-        return phoneNumber.matches("[+]?[0-9() -]{7,20}");
-    }
-
-    private static void displayNotification(
-            String phoneNumber,
-            String deliveryMethod,
-            String message
-    ) {
-        String time = LocalDateTime.now().format(
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-        );
 
         System.out.println();
-        System.out.println("INCOMING NOTIFICATION");
-        System.out.println("----------------------------------------------");
-        System.out.println("Received:  " + time);
-        System.out.println("Recipient: " + phoneNumber);
-        System.out.println("Method:    " + deliveryMethod);
-        System.out.println();
+        System.out.println("NEW NOTIFICATION");
+        System.out.println("--------------------------------");
+        System.out.println(
+            "Time: " + LocalDateTime.now()
+        );
+        System.out.println(
+            "Method: " + deliveryMethod
+        );
+        System.out.println(
+            "Recipient: " + phoneNumber
+        );
         System.out.println("Message:");
         System.out.println(message);
-        System.out.println("----------------------------------------------");
+        System.out.println("--------------------------------");
+
+        return sendThroughWhatsApp(
+            phoneNumber,
+            message
+        );
     }
 
-    private static boolean simulateDelivery(
+    private static String sendThroughWhatsApp(
             String phoneNumber,
-            String deliveryMethod,
             String message
     ) {
-        System.out.println(
-            "[SERVER] Simulating " + deliveryMethod +
-            " delivery to " + phoneNumber + "..."
-        );
+        try {
+            WhatsAppService service =
+                    new WhatsAppService();
 
-        System.out.println(
-            "[SERVER] Notification processed successfully."
-        );
+           /* WhatsAppService.DeliveryResult result =
+                    service.sendMessage(
+                        phoneNumber,
+                        message
+                    );
+            */
+           WhatsAppService.DeliveryResult result =
+                 service.sendTestTemplate(
+                     phoneNumber
+                );
+            System.out.println(
+                "[WHATSAPP] Status code: " +
+                result.getStatusCode()
+            );
 
-        return true;
+            System.out.println(
+                "[WHATSAPP] Provider response: " +
+                result.getProviderResponse()
+            );
+
+            if (result.isSuccessful()) {
+                return "SUCCESS: WhatsApp message accepted for "
+                        + phoneNumber + ".";
+            }
+
+            return "ERROR: " + result.getMessage() + " Provider response: "+ result.getProviderResponse();
+
+        } catch (IllegalStateException e) {
+            return "ERROR: Server API configuration is missing. "
+                    + e.getMessage();
+        }
     }
 }

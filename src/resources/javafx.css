@@ -1,0 +1,120 @@
+.root {
+    -fx-background-color: #f5f7fb;
+    -fx-font-family: "Arial";
+}
+
+.title-label {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #172033;
+}
+
+.description-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #667085;
+}
+
+.form-container {
+    -fx-background-color: white;
+    -fx-background-radius: 12px;
+    -fx-border-color: #d9dee8;
+    -fx-border-radius: 12px;
+    -fx-padding: 25px;
+    -fx-effect: dropshadow(
+        gaussian,
+        rgba(0, 0, 0, 0.08),
+        12,
+        0,
+        0,
+        3
+    );
+}
+
+.label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #344054;
+}
+
+.text-field,
+.text-area {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #cfd5df;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 10px;
+    -fx-font-size: 14px;
+}
+
+.text-field:focused,
+.text-area:focused {
+    -fx-border-color: #315efb;
+    -fx-border-width: 2px;
+}
+
+.text-area .content {
+    -fx-background-color: white;
+    -fx-background-radius: 6px;
+}
+
+.character-count {
+    -fx-font-size: 11px;
+    -fx-font-weight: normal;
+    -fx-text-fill: #667085;
+}
+
+.radio-button {
+    -fx-font-size: 13px;
+    -fx-font-weight: normal;
+}
+
+.send-button {
+    -fx-background-color: #315efb;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 7px;
+    -fx-padding: 10px 20px;
+    -fx-cursor: hand;
+}
+
+.send-button:hover {
+    -fx-background-color: #2448cc;
+}
+
+.send-button:disabled {
+    -fx-opacity: 0.60;
+}
+
+.clear-button {
+    -fx-background-color: #e9edf5;
+    -fx-text-fill: #344054;
+    -fx-font-size: 14px;
+    -fx-background-radius: 7px;
+    -fx-padding: 10px 20px;
+    -fx-cursor: hand;
+}
+
+.clear-button:hover {
+    -fx-background-color: #dce2ed;
+}
+
+.status-ready {
+    -fx-font-weight: normal;
+    -fx-text-fill: #667085;
+}
+
+.status-sending {
+    -fx-font-weight: bold;
+    -fx-text-fill: #b25e09;
+}
+
+.status-success {
+    -fx-font-weight: bold;
+    -fx-text-fill: #087443;
+}
+
+.status-error {
+    -fx-font-weight: bold;
+    -fx-text-fill: #b42318;
+}

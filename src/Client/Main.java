@@ -1,232 +1,377 @@
-//Starts JavaFX and creates GUI
-// testing 
 package client;
 
-import java.util.Scanner;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
 
-public class Main {
+public class Main extends Application {
 
-    private static final Scanner scanner = new Scanner(System.in);
-    private static final TCPClient client = new TCPClient();
+    private TextField phoneNumberField;
+    private TextArea messageArea;
 
-    public static void main(String[] args) {
+    private RadioButton smsButton;
+    private RadioButton whatsappButton;
 
-        boolean running = true;
+    private Button sendButton;
+    private Button clearButton;
 
-        printHeader();
+    private Label statusLabel;
+    private Label characterCountLabel;
 
-        while (running) {
-            printMenu();
+    private final TCPClient tcpClient = new TCPClient();
 
-            System.out.print("Select an option: ");
-            String choice = scanner.nextLine().trim();
+    @Override
+    public void start(Stage stage) {
 
-            switch (choice) {
-                case "1":
-                    createNotification();
-                    break;
+        Label titleLabel =
+                new Label("Message Notification System");
 
-                case "2":
-                    showSystemInformation();
-                    break;
+        titleLabel.getStyleClass().add("title-label");
 
-                case "3":
-                    running = false;
-                    System.out.println("\nClosing the program...");
-                    break;
+        Label descriptionLabel =
+                new Label(
+                    "Send an important notification to a registered recipient."
+                );
 
-                default:
-                    System.out.println(
-                        "\nInvalid selection. Please enter 1, 2, or 3."
-                    );
-            }
-        }
-
-        scanner.close();
-
-        System.out.println("Program closed.");
-    }
-    ///GUI display
-    private static void printHeader() {
-        System.out.println();
-        System.out.println("==============================================");
-        System.out.println("       MESSAGE NOTIFICATION SYSTEM");
-        System.out.println("==============================================");
-        System.out.println("Client address: 127.0.0.1");
-        System.out.println("Server port: 65432");
-    }
-    // main menu options that come up after starting Client.main
-    private static void printMenu() {
-        System.out.println();
-        System.out.println("----------------------------------------------");
-        System.out.println("MAIN MENU");
-        System.out.println("----------------------------------------------");
-        System.out.println("1. Send a notification");
-        System.out.println("2. View system information");
-        System.out.println("3. Exit");
-        System.out.println("----------------------------------------------");
-    }
-
-    private static void createNotification() {
-
-        System.out.println();
-        System.out.println("CREATE NOTIFICATION");
-        System.out.println("----------------------------------------------");
-
-        String phoneNumber = getPhoneNumber();
-        String deliveryMethod = getDeliveryMethod();
-        String message = getMessage();
-
-        printConfirmation(
-            phoneNumber,
-            deliveryMethod,
-            message
+        descriptionLabel.getStyleClass().add(
+            "description-label"
         );
 
-        System.out.print("\nSend this notification? (Y/N): ");
-        String confirmation = scanner.nextLine().trim();
+        VBox headingBox = new VBox(
+            5,
+            titleLabel,
+            descriptionLabel
+        );
 
-        if (!confirmation.equalsIgnoreCase("Y")) {
-            System.out.println("Notification cancelled.");
+        headingBox.setAlignment(Pos.CENTER);
+
+        Label phoneLabel =
+                new Label("Recipient Phone Number");
+
+        phoneNumberField = new TextField();
+
+        phoneNumberField.setPromptText(
+            "Example: +1 671 555 1234"
+        );
+
+        phoneNumberField.getStyleClass().add(
+            "input-field"
+        );
+
+        Label messageLabel =
+                new Label("Notification Message");
+
+        messageArea = new TextArea();
+
+        messageArea.setPromptText(
+            "Enter the notification message..."
+        );
+
+        messageArea.setWrapText(true);
+        messageArea.setPrefRowCount(7);
+
+        characterCountLabel = new Label("0 characters");
+
+        characterCountLabel.getStyleClass().add(
+            "character-count"
+        );
+
+        messageArea.textProperty().addListener(
+            (observable, oldText, newText) -> {
+                characterCountLabel.setText(
+                    newText.length() + " characters"
+                );
+            }
+        );
+
+        VBox messageBox = new VBox(
+            5,
+            messageArea,
+            characterCountLabel
+        );
+
+        Label methodLabel =
+                new Label("Delivery Method");
+
+        ToggleGroup deliveryGroup = new ToggleGroup();
+
+        smsButton = new RadioButton("SMS — Coming Soon");
+        whatsappButton = new RadioButton("WhatsApp");
+
+        smsButton.setToggleGroup(deliveryGroup);
+        whatsappButton.setToggleGroup(deliveryGroup);
+
+        /*
+         * SMS is shown to match the sample interface,
+         * but it is disabled because an SMS API has not
+         * been connected.
+         */
+        smsButton.setDisable(true);
+
+        whatsappButton.setSelected(true);
+
+        HBox deliveryBox = new HBox(
+            25,
+            smsButton,
+            whatsappButton
+        );
+
+        deliveryBox.setAlignment(Pos.CENTER_LEFT);
+
+        sendButton = new Button("Send Message");
+        clearButton = new Button("Clear");
+
+        sendButton.getStyleClass().add("send-button");
+        clearButton.getStyleClass().add("clear-button");
+
+        sendButton.setOnAction(
+            event -> handleSendMessage()
+        );
+
+        clearButton.setOnAction(
+            event -> clearForm()
+        );
+
+        HBox buttonBox = new HBox(
+            12,
+            clearButton,
+            sendButton
+        );
+
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+
+        statusLabel = new Label("Status: Ready");
+
+        statusLabel.getStyleClass().add("status-ready");
+
+        VBox form = new VBox(
+            10,
+            phoneLabel,
+            phoneNumberField,
+            messageLabel,
+            messageBox,
+            methodLabel,
+            deliveryBox,
+            buttonBox,
+            statusLabel
+        );
+
+        form.getStyleClass().add("form-container");
+
+        VBox root = new VBox(
+            25,
+            headingBox,
+            form
+        );
+
+        root.setPadding(new Insets(30));
+        root.setAlignment(Pos.TOP_CENTER);
+
+        Scene scene = new Scene(root, 600, 620);
+
+        String cssFile = getClass()
+                .getResource("/resources/javafx.css")
+                .toExternalForm();
+
+        scene.getStylesheets().add(cssFile);
+
+        stage.setTitle(
+            "Message Notification System"
+        );
+
+        stage.setScene(scene);
+        stage.setMinWidth(550);
+        stage.setMinHeight(600);
+        stage.show();
+    }
+
+    private void handleSendMessage() {
+
+        String phoneNumber =
+                phoneNumberField.getText().trim();
+
+        String message =
+                messageArea.getText().trim();
+
+        String deliveryMethod = "WHATSAPP";
+
+        String validationError =
+                validateInput(phoneNumber, message);
+
+        if (validationError != null) {
+            showError(validationError);
             return;
         }
 
-        System.out.println("\nConnecting to the server...");
+        setSendingState();
 
-        String response = client.sendMessage(
-            phoneNumber,
-            message,
-            deliveryMethod
-        );
+        /*
+         * The network request runs on a background thread.
+         * Without this Task, JavaFX may freeze while waiting
+         * for the server or WhatsApp API.
+         */
+        Task<String> sendTask = new Task<>() {
 
-        System.out.println();
-        System.out.println("SERVER RESPONSE");
-        System.out.println("----------------------------------------------");
-        System.out.println(response);
-        System.out.println("----------------------------------------------");
+            @Override
+            protected String call() {
+                return tcpClient.sendMessage(
+                    phoneNumber,
+                    message,
+                    deliveryMethod
+                );
+            }
+        };
+
+        sendTask.setOnSucceeded(event -> {
+
+            String response = sendTask.getValue();
+
+            sendButton.setDisable(false);
+
+            if (response.startsWith("SUCCESS")) {
+                showSuccess(response);
+            } else {
+                showError(response);
+            }
+        });
+
+        sendTask.setOnFailed(event -> {
+
+            sendButton.setDisable(false);
+
+            Throwable error =
+                    sendTask.getException();
+
+            showError(
+                "The notification could not be sent: " +
+                error.getMessage()
+            );
+        });
+
+        Thread sendThread = new Thread(sendTask);
+
+        sendThread.setDaemon(true);
+        sendThread.start();
     }
 
-    private static String getPhoneNumber() {
-
-        while (true) {
-            System.out.print(
-                "Enter the recipient's phone number: "
-            );
-
-            String phoneNumber = scanner.nextLine().trim();
-
-            /*
-             * Allows numbers, spaces, parentheses, hyphens,
-             * and an optional plus sign.
-             */
-            if (phoneNumber.matches("[+]?[0-9() -]{7,20}")) {
-                return phoneNumber;
-            }
-
-            System.out.println(
-                "Invalid phone number. Please enter at least " +
-                "seven digits."
-            );
-        }
-    }
-
-    private static String getDeliveryMethod() {
-
-        while (true) {
-            System.out.println();
-            System.out.println("Delivery method:");
-            System.out.println("1. SMS");
-            System.out.println("2. WhatsApp");
-            System.out.print("Select a delivery method: ");
-
-            String selection = scanner.nextLine().trim();
-
-            if (selection.equals("1")) {
-                return "SMS";
-            }
-
-            if (selection.equals("2")) {
-                return "WHATSAPP";
-            }
-
-            System.out.println(
-                "Invalid selection. Please enter 1 or 2."
-            );
-        }
-    }
-
-    private static String getMessage() {
-
-        while (true) {
-            System.out.println();
-            System.out.println(
-                "Enter the notification message."
-            );
-            System.out.println(
-                "Press Enter on an empty line when finished:"
-            );
-
-            StringBuilder messageBuilder = new StringBuilder();
-
-            while (true) {
-                String line = scanner.nextLine();
-
-                if (line.isBlank()) {
-                    break;
-                }
-
-                if (messageBuilder.length() > 0) {
-                    messageBuilder.append(System.lineSeparator());
-                }
-
-                messageBuilder.append(line);
-            }
-
-            String message = messageBuilder.toString().trim();
-
-            if (!message.isEmpty()) {
-                return message;
-            }
-
-            System.out.println(
-                "The message cannot be empty."
-            );
-        }
-    }
-
-    private static void printConfirmation(
+    private String validateInput(
             String phoneNumber,
-            String deliveryMethod,
             String message
     ) {
-        System.out.println();
-        System.out.println("NOTIFICATION SUMMARY");
-        System.out.println("----------------------------------------------");
-        System.out.println("Recipient: " + phoneNumber);
-        System.out.println("Method:    " + deliveryMethod);
-        System.out.println();
-        System.out.println("Message:");
-        System.out.println(message);
-        System.out.println("----------------------------------------------");
+        if (phoneNumber.isBlank()) {
+            return "Please enter a phone number.";
+        }
+
+        if (!phoneNumber.matches(
+                "[+]?[0-9() -]{7,20}"
+        )) {
+            return "Please enter a valid phone number.";
+        }
+
+        if (message.isBlank()) {
+            return "Please enter a notification message.";
+        }
+
+        if (message.length() > 1000) {
+            return "The message cannot exceed 1,000 characters.";
+        }
+
+        return null;
     }
 
-    private static void showSystemInformation() {
-        System.out.println();
-        System.out.println("SYSTEM INFORMATION");
-        System.out.println("----------------------------------------------");
-        System.out.println(
-            "The CLI collects a phone number, delivery method, " +
-            "and notification message."
+    private void setSendingState() {
+
+        sendButton.setDisable(true);
+
+        statusLabel.setText(
+            "Status: Sending notification..."
         );
-        System.out.println(
-            "TCPClient sends the request to TCPServer."
+
+        replaceStatusStyle("status-sending");
+    }
+
+    private void showSuccess(String message) {
+
+        statusLabel.setText(
+            "Status: " + message
         );
-        System.out.println(
-            "TCPServer validates and processes the request."
+
+        replaceStatusStyle("status-success");
+
+        showAlert(
+            Alert.AlertType.INFORMATION,
+            "Message Sent",
+            message
         );
-        System.out.println(
-            "Real phone delivery is currently simulated."
+    }
+
+    private void showError(String message) {
+
+        sendButton.setDisable(false);
+
+        statusLabel.setText(
+            "Status: " + message
         );
-        System.out.println("----------------------------------------------");
+
+        replaceStatusStyle("status-error");
+
+        showAlert(
+            Alert.AlertType.ERROR,
+            "Message Error",
+            message
+        );
+    }
+
+    private void replaceStatusStyle(
+            String styleClass
+    ) {
+        statusLabel.getStyleClass().removeAll(
+            "status-ready",
+            "status-sending",
+            "status-success",
+            "status-error"
+        );
+
+        statusLabel.getStyleClass().add(
+            styleClass
+        );
+    }
+
+    private void showAlert(
+            Alert.AlertType alertType,
+            String title,
+            String message
+    ) {
+        Alert alert = new Alert(alertType);
+
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+
+        alert.showAndWait();
+    }
+
+    private void clearForm() {
+
+        phoneNumberField.clear();
+        messageArea.clear();
+
+        whatsappButton.setSelected(true);
+
+        statusLabel.setText("Status: Ready");
+
+        replaceStatusStyle("status-ready");
+
+        phoneNumberField.requestFocus();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 }
