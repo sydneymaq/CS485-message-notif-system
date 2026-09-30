@@ -1,22 +1,17 @@
 # Typhoon Message notification system
 
+This app i scurrently utilizing Meta's WhatsApp API.
+
 ## How to run the program
 
-### create a file for compiled .class files: 
+### In PowerShell enter:
 
-Make sure your terminal is at : 
-CS485-message-notif-system %
+- $env:WHATSAPP_ACCESS_TOKEN="PASTE_YOUR_TOKEN_HERE"
+- $env:WHATSAPP_PHONE_NUMBER_ID="PASTE_YOUR_PHONE_NUMBER_ID_HERE"
+- $env:WHATSAPP_API_VERSION="PASTE_META_API_VERSION_HERE"
 
-Then use command: 
-- mkdir -p out
-- javac -d out src/server/TCPServer.java src/client/TCPClient.java src/client/Main.java
+#### API version must include v (vXX.X)
 
-### run
-use command: java -cp out server.TCPServer
-
-### create new terminal
-
-create new terminal then run: java -cp out client.Main
 
 
 
