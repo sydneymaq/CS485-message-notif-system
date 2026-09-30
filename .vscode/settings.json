@@ -1,7 +1,9 @@
 {
     "java.project.sourcePaths": ["src"],
     "java.project.outputPath": "out",
-    "java.project.referencedLibraries": [
-        "C:\\Users\\sydneyquintanilla\\Downloads\\javafx-sdk-27\\lib\\*.jar"
-    ]
+    "java.project.referencedLibraries": {
+        "include": [
+            "/Users/sydneyquintanilla/Downloads/javafx-sdk-27/lib/*.jar"
+        ]
+    }
 }

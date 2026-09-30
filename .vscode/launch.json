@@ -6,7 +6,7 @@
             "name": "Run JavaFX Client",
             "request": "launch",
             "mainClass": "client.Main",
-            "vmArgs": "--module-path "C:\\Users\\sydneyquintanilla\\Downloads\\javafx-sdk-27\\lib\\*.jar" --add-modules javafx.controls",
+            "vmArgs": "--module-path \"C:/Users/sydneyquintanilla/Downloads/javafx-sdk-27/lib\" --add-modules javafx.controls",
             "console": "integratedTerminal"
         },
         {
