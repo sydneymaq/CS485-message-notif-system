@@ -79,5 +79,9 @@ Set path to JavaFX SDK :
 
 ### In terminal 2:
 
+(if css was changed first use):
+
+- cp src/resources/javafx.css out/resources/javafx.css
+
 - export JAVAFX_PATH="/Users/sydneyquintanilla/Downloads/javafx-sdk-27/lib/"
 - java --module-path "$JAVAFX_PATH" --add-modules javafx.controls -cp out client.Main
