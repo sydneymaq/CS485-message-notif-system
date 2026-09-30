@@ -19,7 +19,7 @@ This app is currently utilizing Vonage's sandbox API.
 
 ## Make new powershell terminal
 Set path to JavaFX SDK : 
-- $env:JAVAFX_PATH="C:\path\to\javafx-sdk-21.0.10\lib" * make sure it matches ur javafx sdk location
+- $env:JAVAFX_PATH="C:/Users/sydneyquintanilla/Downloads/javafx-sdk-27/lib"  * make sure it matches ur perosnal javafx lib path
 
 ### create output directories
 - New-Item -ItemType Directory -Force out
