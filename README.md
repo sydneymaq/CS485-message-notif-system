@@ -58,10 +58,26 @@ Set path to JavaFX SDK :
 
 - export JAVAFX_PATH=/Users/sydneyquintanilla/Downloads/javafx-sdk-27/lib/
 
-## Run:
+### Run:
 
 - java \
   --module-path "$JAVAFX_PATH" \
   --add-modules javafx.controls \
   -cp out \
   client.Main
+
+## Run procedure after initial compiling is done:
+
+### In terminal 1:
+
+- export VONAGE_API_KEY="a3f45751"
+- export VONAGE_API_SECRET="YOUR_REAL_API_SECRET"
+- export VONAGE_SANDBOX_NUMBER="14157386102"
+- export VONAGE_SANDBOX_URL="https://messages-sandbox.nexmo.com/v1/messages"
+- clear
+- java -cp out server.TCPServer
+
+### In terminal 2:
+
+- export JAVAFX_PATH="/Users/sydneyquintanilla/Downloads/javafx-sdk-27/lib/"
+- java --module-path "$JAVAFX_PATH" --add-modules javafx.controls -cp out client.Main
