@@ -12,7 +12,9 @@ This app is currently utilizing Vonage's sandbox API.
 
 ### Set sandbox endpoint
 
-- $env:VONAGE_SANDBOX_URL="https://messages-sandbox.nexmo.com/v1/messages" \* make sure it is same as URL in sandbox page
+- $env:VONAGE_SANDBOX_URL="https://messages-sandbox.nexmo.com/v1/messages"
+
+* make sure it is same as URL in sandbox page
 
 ### confirm nonsecret values
 
