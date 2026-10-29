@@ -136,6 +136,40 @@
 }
 
 /* =========================================================
+   INPUT ERROR STATE (red outline)
+   Added in Main.java to a field whose value is invalid or
+   whose send failed. Listed after the normal and :focused
+   rules so the red outline still wins while the field has focus.
+   ========================================================= */
+
+.text-field.input-error,
+.text-field.input-error:hover,
+.text-field.input-error:focused {
+  -fx-background-color: #fff7f6;
+
+  -fx-border-color: #d92d20;
+  -fx-border-width: 2px;
+
+  -fx-effect: dropshadow(gaussian, rgba(217, 45, 32, 0.30), 8, 0, 0, 0);
+}
+
+.text-area.input-error,
+.text-area.input-error:hover,
+.text-area.input-error:focused {
+  -fx-background-color: #fff7f6;
+
+  -fx-border-color: #d92d20;
+  -fx-border-width: 2px;
+
+  -fx-effect: dropshadow(gaussian, rgba(217, 45, 32, 0.30), 8, 0, 0, 0);
+}
+
+.text-area.input-error .content,
+.text-area.input-error:focused .content {
+  -fx-background-color: #fff7f6;
+}
+
+/* =========================================================
    CHARACTER COUNTER
    ========================================================= */
 
@@ -311,6 +345,8 @@
   -fx-border-radius: 8px;
 }
 
+/* Error: bold red outline with a thicker left edge as a warning stripe.
+   Main.java also puts a caution sign at the start of the text. */
 .status-error {
   -fx-font-size: 13px;
   -fx-font-weight: bold;
@@ -321,8 +357,29 @@
 
   -fx-padding: 9px 13px;
 
-  -fx-border-color: #f1b5b0;
+  -fx-border-color: #d92d20;
+  -fx-border-width: 2px 2px 2px 7px;
   -fx-border-radius: 8px;
+
+  -fx-effect: dropshadow(gaussian, rgba(217, 45, 32, 0.25), 8, 0, 0, 0);
+}
+
+/* Warning: amber version used when only some recipients failed. */
+.status-warning {
+  -fx-font-size: 13px;
+  -fx-font-weight: bold;
+  -fx-text-fill: #93370d;
+
+  -fx-background-color: #fffaeb;
+  -fx-background-radius: 8px;
+
+  -fx-padding: 9px 13px;
+
+  -fx-border-color: #f79009;
+  -fx-border-width: 2px 2px 2px 7px;
+  -fx-border-radius: 8px;
+
+  -fx-effect: dropshadow(gaussian, rgba(247, 144, 9, 0.25), 8, 0, 0, 0);
 }
 
 /* =========================================================

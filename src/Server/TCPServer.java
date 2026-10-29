@@ -8,7 +8,11 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Local TCP server for the Message Notification System.
@@ -20,6 +24,9 @@ public class TCPServer {
 
     // This must match the port configured in TCPClient.
     private static final int PORT = 65432;
+
+    // Largest number of recipients accepted in one request (matches client).
+    private static final int MAX_RECIPIENTS = 20;
 
     /** Starts the server and continuously waits for clients. */
     public static void main(String[] args) {
@@ -101,7 +108,8 @@ public class TCPServer {
 
         /*
          * Split into no more than three fields:
-         * delivery method, phone number, and encoded message.
+         * delivery method, phone number list, and encoded message.
+         * The phone field may hold several numbers separated by commas.
          */
         String[] parts = request.split("\\|", 3);
 
@@ -112,7 +120,7 @@ public class TCPServer {
 
         // Extract and clean each request field.
         String deliveryMethod = parts[0].trim();
-        String phoneNumber = parts[1].trim();
+        String phoneField = parts[1].trim();
         String encodedMessage = parts[2].trim();
 
         // Reject unimplemented delivery channels.
@@ -120,9 +128,31 @@ public class TCPServer {
             return "ERROR: Only WhatsApp is available.";
         }
 
-        // Revalidate the phone number instead of trusting client validation.
-        if (!phoneNumber.matches("[+]?[0-9() -]{7,20}")) {
-            return "ERROR: Invalid phone number.";
+        // Split the list, revalidate every number, and drop duplicates.
+        List<String> recipients = new ArrayList<>();
+        Set<String> seenDigits = new HashSet<>();
+
+        for (String entry : phoneField.split("[,;]")) {
+            String number = entry.trim();
+            if (number.isEmpty()) {
+                continue;
+            }
+            if (!number.matches("[+]?[0-9() -]{7,20}")) {
+                return "ERROR: Invalid phone number: " + number + ".";
+            }
+            String digits = number.replaceAll("[^0-9]", "");
+            if (seenDigits.add(digits)) {
+                recipients.add(number);
+            }
+        }
+
+        if (recipients.isEmpty()) {
+            return "ERROR: No phone numbers provided.";
+        }
+
+        if (recipients.size() > MAX_RECIPIENTS) {
+            return "ERROR: At most " + MAX_RECIPIENTS +
+                   " recipients are allowed per request.";
         }
 
         String message;
@@ -148,15 +178,15 @@ public class TCPServer {
         }
 
         // Log the validated notification in the server terminal.
-        displayNotification(phoneNumber, deliveryMethod, message);
+        displayNotification(recipients, deliveryMethod, message);
 
-        // Send through Vonage and return the result to TCPClient.
-        return sendThroughVonage(phoneNumber, message);
+        // Send to every recipient and return one combined result to TCPClient.
+        return sendToAllRecipients(recipients, message);
     }
 
     /** Prints a readable copy of the accepted request for demonstration. */
     private static void displayNotification(
-            String phoneNumber,
+            List<String> recipients,
             String deliveryMethod,
             String message
     ) {
@@ -164,7 +194,8 @@ public class TCPServer {
         System.out.println("INCOMING NOTIFICATION");
         System.out.println("----------------------------------------");
         System.out.println("Received: " + LocalDateTime.now());
-        System.out.println("Recipient: " + phoneNumber);
+        System.out.println("Recipients (" + recipients.size() + "): " +
+                           String.join(", ", recipients));
         System.out.println("Method: " + deliveryMethod);
         System.out.println();
         System.out.println("Message:");
@@ -172,40 +203,22 @@ public class TCPServer {
         System.out.println("----------------------------------------");
     }
 
-    /** Calls VonageService and converts its result into a client response. */
-    private static String sendThroughVonage(
-            String phoneNumber,
+    /**
+     * Sends the message to each recipient through VonageService and builds one
+     * single-line response summarizing every result.
+     *
+     * The Vonage Messages API accepts one recipient per request, so this loops
+     * and keeps going even if an individual send fails.
+     */
+    private static String sendToAllRecipients(
+            List<String> recipients,
             String message
     ) {
+        VonageService service;
+
         try {
             // The constructor also verifies the required environment variables.
-            VonageService service = new VonageService();
-
-            // Submit the message and receive a structured delivery result.
-            VonageService.DeliveryResult result = service.sendMessage(
-                phoneNumber,
-                message
-            );
-
-            // Log details that are useful during testing and demonstrations.
-            System.out.println();
-            System.out.println(
-                "[VONAGE] HTTP status: " + result.getStatusCode()
-            );
-            System.out.println("[VONAGE] Result: " + result.getMessage());
-            System.out.println(
-                "[VONAGE] Provider response: " + result.getProviderResponse()
-            );
-
-            // Translate a successful API result into GUI-friendly text.
-            if (result.isSuccessful()) {
-                return "SUCCESS: WhatsApp message accepted for " +
-                       phoneNumber + ".";
-            }
-
-            // Include the HTTP status when the provider rejects the request.
-            return "ERROR: " + result.getMessage() +
-                   " HTTP status " + result.getStatusCode() + ".";
+            service = new VonageService();
 
         } catch (IllegalStateException e) {
             // Missing Vonage environment variables are configuration errors.
@@ -215,5 +228,53 @@ public class TCPServer {
             return "ERROR: Server configuration is incomplete. " +
                    e.getMessage();
         }
+
+        List<String> succeeded = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+
+        for (String phoneNumber : recipients) {
+
+            // Submit the message and receive a structured delivery result.
+            VonageService.DeliveryResult result = service.sendMessage(
+                phoneNumber,
+                message
+            );
+
+            // Log details that are useful during testing and demonstrations.
+            System.out.println();
+            System.out.println("[VONAGE] Recipient: " + phoneNumber);
+            System.out.println(
+                "[VONAGE] HTTP status: " + result.getStatusCode()
+            );
+            System.out.println("[VONAGE] Result: " + result.getMessage());
+            System.out.println(
+                "[VONAGE] Provider response: " + result.getProviderResponse()
+            );
+
+            if (result.isSuccessful()) {
+                succeeded.add(phoneNumber);
+            } else {
+                failed.add(phoneNumber + " (HTTP " +
+                           result.getStatusCode() + ")");
+            }
+        }
+
+        int total = recipients.size();
+
+        // Every recipient was accepted.
+        if (failed.isEmpty()) {
+            return "SUCCESS: WhatsApp message accepted for " + total +
+                   " recipient(s): " + String.join(", ", succeeded) + ".";
+        }
+
+        // Nobody received the message.
+        if (succeeded.isEmpty()) {
+            return "ERROR: Message failed for all " + total +
+                   " recipient(s): " + String.join(", ", failed) + ".";
+        }
+
+        // Mixed outcome: tell the user exactly who was missed.
+        return "PARTIAL: Sent to " + succeeded.size() + " of " + total +
+               ". Failed: " + String.join(", ", failed) + ".";
     }
 }

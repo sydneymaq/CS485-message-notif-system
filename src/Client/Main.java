@@ -10,6 +10,11 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 /**
  * Main JavaFX application for the Message Notification System.
  *
@@ -17,6 +22,12 @@ import javafx.stage.Stage;
  * background thread, and displays success or error feedback to the user.
  */
 public class Main extends Application {
+
+    // Largest number of recipients allowed in a single send (matches server).
+    private static final int MAX_RECIPIENTS = 20;
+
+    // Format accepted for each individual phone number.
+    private static final String PHONE_PATTERN = "[+]?[0-9() -]{7,20}";
 
     // Form controls that are accessed by multiple methods in this class.
     private TextField phoneNumberField;
@@ -50,7 +61,7 @@ public class Main extends Application {
 
         // Add a short explanation below the heading.
         Label descriptionLabel = new Label(
-            "Send an important notification to a registered recipient."
+            "Send an important notification to one or more registered recipients."
         );
         descriptionLabel.getStyleClass().add("description-label");
 
@@ -59,9 +70,9 @@ public class Main extends Application {
         headingBox.setAlignment(Pos.CENTER);
 
         // Build the phone-number portion of the form.
-        Label phoneLabel = new Label("Recipient Phone Number");
+        Label phoneLabel = new Label("Recipient Phone Number(s) — separate with commas");
         phoneNumberField = new TextField();
-        phoneNumberField.setPromptText("Example: +1 671 555 1234");
+        phoneNumberField.setPromptText("Example: +1 671 555 1234, +1 671 555 5678");
         phoneNumberField.getStyleClass().add("input-field");
 
         // Build the message portion of the form.
@@ -74,6 +85,16 @@ public class Main extends Application {
         // Initially, the message contains zero characters.
         characterCountLabel = new Label("0 characters");
         characterCountLabel.getStyleClass().add("character-count");
+
+        // Remove the red error outline once the user edits a field again.
+        phoneNumberField.textProperty().addListener(
+            (observable, oldText, newText) ->
+                phoneNumberField.getStyleClass().remove("input-error")
+        );
+        messageArea.textProperty().addListener(
+            (observable, oldText, newText) ->
+                messageArea.getStyleClass().remove("input-error")
+        );
 
         // Update the character counter every time the message changes.
         messageArea.textProperty().addListener(
@@ -160,19 +181,25 @@ public class Main extends Application {
     /** Collects the form data and begins the message-sending process. */
     private void handleSendMessage() {
 
+        // Clear any red outlines left over from a previous attempt.
+        clearFieldErrors();
+
         // Read the user's values and remove surrounding whitespace.
-        String phoneNumber = phoneNumberField.getText().trim();
+        String phoneInput = phoneNumberField.getText().trim();
         String message = messageArea.getText().trim();
 
         // WhatsApp is currently the only enabled option.
         String deliveryMethod = "WHATSAPP";
 
         // Validate locally before opening a network connection.
-        String validationError = validateInput(phoneNumber, message);
+        String validationError = validateInput(phoneInput, message);
         if (validationError != null) {
             showError(validationError);
             return; // Do not continue if the input is invalid.
         }
+
+        // Combine the cleaned, de-duplicated recipients into one comma list.
+        String phoneNumbers = String.join(",", parseRecipients(phoneInput));
 
         // Disable repeated submissions and show progress to the user.
         setSendingState();
@@ -186,7 +213,7 @@ public class Main extends Application {
             @Override
             protected String call() {
                 return tcpClient.sendMessage(
-                    phoneNumber,
+                    phoneNumbers,
                     message,
                     deliveryMethod
                 );
@@ -201,6 +228,8 @@ public class Main extends Application {
             // Use the response prefix to decide which feedback to display.
             if (response.startsWith("SUCCESS")) {
                 showSuccess(response);
+            } else if (response.startsWith("PARTIAL")) {
+                showPartial(response);
             } else {
                 showError(response);
             }
@@ -221,17 +250,49 @@ public class Main extends Application {
         sendThread.start();
     }
 
-    /** Returns an error message, or null when both values are valid. */
-    private String validateInput(String phoneNumber, String message) {
+    /**
+     * Splits the phone-number field on commas or semicolons, trims each entry,
+     * and removes blanks and duplicates (comparing digits only).
+     */
+    private List<String> parseRecipients(String phoneInput) {
+        List<String> recipients = new ArrayList<>();
+        Set<String> seenDigits = new HashSet<>();
 
-        // A recipient is required.
-        if (phoneNumber.isBlank()) {
-            return "Please enter a phone number.";
+        for (String entry : phoneInput.split("[,;]")) {
+            String number = entry.trim();
+            if (number.isEmpty()) {
+                continue;
+            }
+            // "+1 671 555 1234" and "16715551234" count as the same person.
+            String digits = number.replaceAll("[^0-9]", "");
+            if (seenDigits.add(digits)) {
+                recipients.add(number);
+            }
+        }
+        return recipients;
+    }
+
+    /** Returns an error message, or null when both values are valid. */
+    private String validateInput(String phoneInput, String message) {
+
+        List<String> recipients = parseRecipients(phoneInput);
+
+        // At least one recipient is required.
+        if (recipients.isEmpty()) {
+            return "Please enter at least one phone number.";
         }
 
-        // Permit common phone formatting while limiting the overall length.
-        if (!phoneNumber.matches("[+]?[0-9() -]{7,20}")) {
-            return "Please enter a valid phone number.";
+        // Limit how many messages one click can trigger.
+        if (recipients.size() > MAX_RECIPIENTS) {
+            return "You can send to at most " + MAX_RECIPIENTS +
+                   " recipients at a time.";
+        }
+
+        // Every number in the list must be valid.
+        for (String number : recipients) {
+            if (!number.matches(PHONE_PATTERN)) {
+                return "Please enter a valid phone number: " + number;
+            }
         }
 
         // A notification cannot be empty.
@@ -261,12 +322,52 @@ public class Main extends Application {
         showAlert(Alert.AlertType.INFORMATION, "Message Sent", message);
     }
 
+    /** Displays feedback when only some recipients received the message. */
+    private void showPartial(String message) {
+        statusLabel.setText("\u26A0 Status: " + message);
+        replaceStatusStyle("status-warning");
+        phoneNumberField.requestFocus();
+        markFieldError(phoneNumberField);
+        showAlert(Alert.AlertType.WARNING, "Some Messages Failed", message);
+    }
+
     /** Displays error feedback and re-enables the Send button. */
     private void showError(String message) {
         sendButton.setDisable(false);
-        statusLabel.setText("Status: " + message);
+        statusLabel.setText("\u26A0 Status: " + message);
         replaceStatusStyle("status-error");
+        highlightFieldForError(message);
         showAlert(Alert.AlertType.ERROR, "Message Error", message);
+    }
+
+    /** Adds the red outline to a field (only once). */
+    private void markFieldError(Control field) {
+        if (!field.getStyleClass().contains("input-error")) {
+            field.getStyleClass().add("input-error");
+        }
+    }
+
+    /** Removes the red outline from both input fields. */
+    private void clearFieldErrors() {
+        phoneNumberField.getStyleClass().remove("input-error");
+        messageArea.getStyleClass().remove("input-error");
+    }
+
+    /**
+     * Chooses which field to outline in red based on the error text:
+     * problems that mention the phone number or recipients mark the phone
+     * field, problems with the message mark the message box.
+     */
+    private void highlightFieldForError(String error) {
+        String text = error.toLowerCase();
+
+        if (text.contains("phone") || text.contains("recipient")) {
+            markFieldError(phoneNumberField);
+        } else if (text.contains("message cannot")
+                || text.contains("notification message")
+                || text.contains("characters")) {
+            markFieldError(messageArea);
+        }
     }
 
     /** Replaces the previous status color with the requested CSS class. */
@@ -275,7 +376,8 @@ public class Main extends Application {
             "status-ready",
             "status-sending",
             "status-success",
-            "status-error"
+            "status-error",
+            "status-warning"
         );
         statusLabel.getStyleClass().add(styleClass);
     }
@@ -295,6 +397,7 @@ public class Main extends Application {
 
     /** Restores the form to its initial state. */
     private void clearForm() {
+        clearFieldErrors();
         phoneNumberField.clear();
         messageArea.clear();
         whatsappButton.setSelected(true);
