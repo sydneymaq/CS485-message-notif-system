@@ -10,7 +10,8 @@ import java.time.Duration;
 import java.util.Base64;
 
 /**
- * Handles the external Vonage Messages Sandbox connection.
+ * Handles the external Vonage Messages API connection for both delivery
+ * channels: the WhatsApp sandbox and SMS.
  *
  * TCPServer supplies a recipient and message. This class cleans the values,
  * creates the JSON payload, authenticates the request, submits it over HTTPS,
@@ -18,17 +19,34 @@ import java.util.Base64;
  */
 public class VonageService {
 
+    // Production Messages API endpoint, used for SMS unless overridden.
+    private static final String DEFAULT_SMS_URL =
+            "https://api.nexmo.com/v1/messages";
+
+    // Default SMS sender name (same value as the Vonage dashboard example).
+    private static final String DEFAULT_SMS_SENDER = "Vonage APIs";
+
+    // Which channel this instance sends on: "whatsapp" or "sms".
+    private final String channel;
+
     // Values are loaded from environment variables instead of hard-coded.
     private final String apiKey;
     private final String apiSecret;
-    private final String sandboxNumber;
-    private final String sandboxUrl;
+
+    // "From" value: the sandbox number (WhatsApp) or SMS sender ID / number.
+    private final String sender;
+
+    // Messages API endpoint for the chosen channel.
+    private final String apiUrl;
 
     // Reusable client for outbound HTTPS requests.
     private final HttpClient httpClient;
 
-    /** Loads configuration and creates the HTTP client. */
-    public VonageService() {
+    /**
+     * Loads configuration for the requested delivery method ("SMS" or
+     * "WHATSAPP") and creates the HTTP client.
+     */
+    public VonageService(String deliveryMethod) {
 
         // Public account identifier used for Basic Authentication.
         apiKey = System.getenv("VONAGE_API_KEY");
@@ -36,11 +54,22 @@ public class VonageService {
         // Private secret paired with the API key.
         apiSecret = System.getenv("VONAGE_API_SECRET");
 
-        // WhatsApp sender number assigned by the Vonage sandbox.
-        sandboxNumber = System.getenv("VONAGE_SANDBOX_NUMBER");
+        if ("SMS".equalsIgnoreCase(deliveryMethod)) {
+            channel = "sms";
 
-        // Sandbox Messages API endpoint supplied by Vonage.
-        sandboxUrl = System.getenv("VONAGE_SANDBOX_URL");
+            // Optional overrides; sensible defaults are used when unset.
+            apiUrl = envOrDefault("VONAGE_SMS_URL", DEFAULT_SMS_URL);
+            sender = envOrDefault("VONAGE_SMS_FROM", DEFAULT_SMS_SENDER);
+
+        } else {
+            channel = "whatsapp";
+
+            // Sandbox Messages API endpoint supplied by Vonage.
+            apiUrl = System.getenv("VONAGE_SANDBOX_URL");
+
+            // WhatsApp sender number assigned by the Vonage sandbox.
+            sender = System.getenv("VONAGE_SANDBOX_NUMBER");
+        }
 
         // Stop connection attempts that cannot be established within 15 seconds.
         httpClient = HttpClient.newBuilder()
@@ -49,6 +78,12 @@ public class VonageService {
 
         // Fail early with a clear message when configuration is incomplete.
         validateConfiguration();
+    }
+
+    /** Returns an environment variable, or a fallback when it is unset/blank. */
+    private static String envOrDefault(String name, String fallback) {
+        String value = System.getenv(name);
+        return (value == null || value.isBlank()) ? fallback : value;
     }
 
     /** Ensures every required environment variable is available. */
@@ -62,18 +97,28 @@ public class VonageService {
             throw new IllegalStateException("VONAGE_API_SECRET is missing.");
         }
 
-        if (sandboxNumber == null || sandboxNumber.isBlank()) {
-            throw new IllegalStateException(
-                "VONAGE_SANDBOX_NUMBER is missing."
-            );
-        }
+        // Only the WhatsApp sandbox needs these two variables.
+        if (channel.equals("whatsapp")) {
+            if (sender == null || sender.isBlank()) {
+                throw new IllegalStateException(
+                    "VONAGE_SANDBOX_NUMBER is missing."
+                );
+            }
 
-        if (sandboxUrl == null || sandboxUrl.isBlank()) {
-            throw new IllegalStateException("VONAGE_SANDBOX_URL is missing.");
+            if (apiUrl == null || apiUrl.isBlank()) {
+                throw new IllegalStateException(
+                    "VONAGE_SANDBOX_URL is missing."
+                );
+            }
         }
     }
 
-    /** Sends one WhatsApp text message through the Vonage sandbox. */
+    /** Readable channel name used in result messages. */
+    private String channelLabel() {
+        return channel.equals("sms") ? "SMS" : "WhatsApp";
+    }
+
+    /** Sends one text message on this service's channel (SMS or WhatsApp). */
     public DeliveryResult sendMessage(
             String recipientPhoneNumber,
             String message
@@ -81,11 +126,12 @@ public class VonageService {
 
         try {
             // Vonage expects phone numbers as digits without display formatting.
-            String cleanRecipient = cleanPhoneNumber(recipientPhoneNumber);
-            String cleanSender = cleanPhoneNumber(sandboxNumber);
+            String cleanRecipient = normalizeRecipient(recipientPhoneNumber);
+            String cleanSender = formatSender();
 
             /*
-             * Build the JSON object required by the Messages API.
+             * Build the JSON object required by the Messages API. The same
+             * shape is used for SMS and WhatsApp; only "channel" differs.
              * escapeJson protects quotes, slashes, tabs, and line breaks that
              * may appear in the user's notification.
              */
@@ -93,13 +139,14 @@ public class VonageService {
                     {
                       "to": "%s",
                       "from": "%s",
-                      "channel": "whatsapp",
+                      "channel": "%s",
                       "message_type": "text",
                       "text": "%s"
                     }
                     """.formatted(
                         escapeJson(cleanRecipient),
                         escapeJson(cleanSender),
+                        channel,
                         escapeJson(message)
                     );
 
@@ -116,7 +163,7 @@ public class VonageService {
              * JSON message. The API response must also be returned as JSON.
              */
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(sandboxUrl))
+                    .uri(URI.create(apiUrl))
                     .timeout(Duration.ofSeconds(30))
                     .header(
                         "Authorization",
@@ -146,7 +193,7 @@ public class VonageService {
             if (statusCode >= 200 && statusCode < 300) {
                 return new DeliveryResult(
                     true,
-                    "Vonage accepted the WhatsApp message.",
+                    "Vonage accepted the " + channelLabel() + " message.",
                     statusCode,
                     responseBody
                 );
@@ -155,7 +202,7 @@ public class VonageService {
             // Preserve Vonage's response when the provider rejects the request.
             return new DeliveryResult(
                 false,
-                "Vonage rejected the WhatsApp message.",
+                "Vonage rejected the " + channelLabel() + " message.",
                 statusCode,
                 responseBody
             );
@@ -180,6 +227,26 @@ public class VonageService {
                 e.toString()
             );
         }
+    }
+
+    /**
+     * Formats the "from" value. Numbers are reduced to digits; an
+     * alphanumeric SMS sender ID such as "Vonage APIs" is sent unchanged.
+     */
+    private String formatSender() {
+        if (sender.matches("[+0-9 ()-]+")) {
+            return cleanPhoneNumber(sender);
+        }
+        return sender;
+    }
+
+    /**
+     * Cleans a recipient number and adds the US/Guam country code (1) when
+     * only 10 digits were given, e.g. "671 489 1960" -> "16714891960".
+     */
+    private String normalizeRecipient(String phoneNumber) {
+        String digits = cleanPhoneNumber(phoneNumber);
+        return digits.length() == 10 ? "1" + digits : digits;
     }
 
     /** Removes all characters except digits from a phone number. */

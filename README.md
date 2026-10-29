@@ -38,15 +38,11 @@ Set path to JavaFX SDK :
 
 ### compile
 
-- javac \ --module-path "$JAVAFX_PATH" \ --add-modules javafx.controls \ -d out \
-  src/client/Main.java \
-  src/client/TCPClient.java \
-  src/server/TCPServer.java \
-  src/server/VonageService.java
+- javac --module-path "$JAVAFX_PATH" --add-modules javafx.controls -d out src/client/Main.java src/client/TCPClient.java src/server/TCPServer.java src/server/VonageService.java
 
 ### copy css
 
-- Copy-Item src\resources\javafx.css out\resources\javafx.css -Force
+- cp src/resources/javafx.css out/resources/javafx.css
 
 ### Make sure sandbox is active
 

@@ -123,9 +123,10 @@ public class TCPServer {
         String phoneField = parts[1].trim();
         String encodedMessage = parts[2].trim();
 
-        // Reject unimplemented delivery channels.
-        if (!deliveryMethod.equalsIgnoreCase("WHATSAPP")) {
-            return "ERROR: Only WhatsApp is available.";
+        // Only SMS and WhatsApp are supported delivery channels.
+        deliveryMethod = deliveryMethod.toUpperCase();
+        if (!deliveryMethod.equals("WHATSAPP") && !deliveryMethod.equals("SMS")) {
+            return "ERROR: Unsupported delivery method.";
         }
 
         // Split the list, revalidate every number, and drop duplicates.
@@ -141,6 +142,9 @@ public class TCPServer {
                 return "ERROR: Invalid phone number: " + number + ".";
             }
             String digits = number.replaceAll("[^0-9]", "");
+            if (digits.length() == 10) {
+                digits = "1" + digits; // Treat as a US/Guam number.
+            }
             if (seenDigits.add(digits)) {
                 recipients.add(number);
             }
@@ -172,8 +176,12 @@ public class TCPServer {
             return "ERROR: Message cannot be empty.";
         }
 
-        // Apply the provider's WhatsApp text-length limit.
-        if (message.length() > 4096) {
+        // Apply the provider's text-length limit for the chosen channel.
+        if (deliveryMethod.equals("SMS") && message.length() > 1000) {
+            return "ERROR: SMS messages cannot exceed 1,000 characters.";
+        }
+
+        if (deliveryMethod.equals("WHATSAPP") && message.length() > 4096) {
             return "ERROR: WhatsApp messages cannot exceed 4,096 characters.";
         }
 
@@ -181,7 +189,7 @@ public class TCPServer {
         displayNotification(recipients, deliveryMethod, message);
 
         // Send to every recipient and return one combined result to TCPClient.
-        return sendToAllRecipients(recipients, message);
+        return sendToAllRecipients(recipients, message, deliveryMethod);
     }
 
     /** Prints a readable copy of the accepted request for demonstration. */
@@ -212,13 +220,17 @@ public class TCPServer {
      */
     private static String sendToAllRecipients(
             List<String> recipients,
-            String message
+            String message,
+            String deliveryMethod
     ) {
         VonageService service;
 
+        // Readable channel name used in the response text.
+        String channelLabel = deliveryMethod.equals("SMS") ? "SMS" : "WhatsApp";
+
         try {
             // The constructor also verifies the required environment variables.
-            service = new VonageService();
+            service = new VonageService(deliveryMethod);
 
         } catch (IllegalStateException e) {
             // Missing Vonage environment variables are configuration errors.
@@ -263,7 +275,7 @@ public class TCPServer {
 
         // Every recipient was accepted.
         if (failed.isEmpty()) {
-            return "SUCCESS: WhatsApp message accepted for " + total +
+            return "SUCCESS: " + channelLabel + " message accepted for " + total +
                    " recipient(s): " + String.join(", ", succeeded) + ".";
         }
 

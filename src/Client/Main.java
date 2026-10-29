@@ -8,7 +8,13 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -33,7 +39,7 @@ public class Main extends Application {
     private TextField phoneNumberField;
     private TextArea messageArea;
 
-    // Delivery method controls. SMS is displayed but not implemented yet.
+    // Delivery method controls (SMS or WhatsApp).
     private RadioButton smsButton;
     private RadioButton whatsappButton;
 
@@ -75,6 +81,16 @@ public class Main extends Application {
         phoneNumberField.setPromptText("Example: +1 671 555 1234, +1 671 555 5678");
         phoneNumberField.getStyleClass().add("input-field");
 
+        // Button that fills the phone field from a CSV file of numbers.
+        Button loadCsvButton = new Button("Load CSV...");
+        loadCsvButton.getStyleClass().add("clear-button");
+        loadCsvButton.setOnAction(event -> handleLoadCsv(stage));
+
+        // Show the phone field and the CSV button on one row.
+        HBox.setHgrow(phoneNumberField, Priority.ALWAYS);
+        HBox phoneRow = new HBox(10, phoneNumberField, loadCsvButton);
+        phoneRow.setAlignment(Pos.CENTER_LEFT);
+
         // Build the message portion of the form.
         Label messageLabel = new Label("Notification Message");
         messageArea = new TextArea();
@@ -109,15 +125,12 @@ public class Main extends Application {
         // Create mutually exclusive delivery-method choices.
         Label methodLabel = new Label("Delivery Method");
         ToggleGroup deliveryGroup = new ToggleGroup();
-        smsButton = new RadioButton("SMS — Coming Soon");
+        smsButton = new RadioButton("SMS");
         whatsappButton = new RadioButton("WhatsApp");
         smsButton.setToggleGroup(deliveryGroup);
         whatsappButton.setToggleGroup(deliveryGroup);
 
-        // SMS is visible for the planned design but has no connected API yet.
-        smsButton.setDisable(true);
-
-        // WhatsApp is the current and default delivery method.
+        // WhatsApp is the default delivery method; SMS is also available.
         whatsappButton.setSelected(true);
 
         // Display the delivery options next to one another.
@@ -146,7 +159,7 @@ public class Main extends Application {
         VBox form = new VBox(
             10,
             phoneLabel,
-            phoneNumberField,
+            phoneRow,
             messageLabel,
             messageBox,
             methodLabel,
@@ -188,8 +201,8 @@ public class Main extends Application {
         String phoneInput = phoneNumberField.getText().trim();
         String message = messageArea.getText().trim();
 
-        // WhatsApp is currently the only enabled option.
-        String deliveryMethod = "WHATSAPP";
+        // Use whichever delivery method the user selected.
+        String deliveryMethod = smsButton.isSelected() ? "SMS" : "WHATSAPP";
 
         // Validate locally before opening a network connection.
         String validationError = validateInput(phoneInput, message);
@@ -264,12 +277,95 @@ public class Main extends Application {
                 continue;
             }
             // "+1 671 555 1234" and "16715551234" count as the same person.
-            String digits = number.replaceAll("[^0-9]", "");
-            if (seenDigits.add(digits)) {
+            if (seenDigits.add(digitsOf(number))) {
                 recipients.add(number);
             }
         }
         return recipients;
+    }
+
+    /**
+     * Returns a number's digits for duplicate checking. A 10-digit number is
+     * treated as a US/Guam number, so "671 489 1960" equals "1 671 489 1960".
+     */
+    private String digitsOf(String number) {
+        String digits = number.replaceAll("[^0-9]", "");
+        return digits.length() == 10 ? "1" + digits : digits;
+    }
+
+    /** Lets the user pick a CSV file and loads its phone numbers. */
+    private void handleLoadCsv(Stage stage) {
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Select recipients CSV file");
+        chooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("CSV files (*.csv)", "*.csv"),
+            new FileChooser.ExtensionFilter("All files", "*.*")
+        );
+
+        File file = chooser.showOpenDialog(stage);
+        if (file == null) {
+            return; // The user closed the dialog without choosing a file.
+        }
+
+        try {
+            List<String> numbers = readNumbersFromCsv(file);
+
+            if (numbers.isEmpty()) {
+                showError(
+                    "No phone numbers were found in " + file.getName() + "."
+                );
+                return;
+            }
+
+            if (numbers.size() > MAX_RECIPIENTS) {
+                showError(
+                    file.getName() + " has " + numbers.size() +
+                    " recipients; the limit is " + MAX_RECIPIENTS + "."
+                );
+                return;
+            }
+
+            // Show the loaded numbers so the user can review or edit them.
+            clearFieldErrors();
+            phoneNumberField.setText(String.join(", ", numbers));
+            statusLabel.setText(
+                "Status: Loaded " + numbers.size() +
+                " recipient(s) from " + file.getName() + "."
+            );
+            replaceStatusStyle("status-success");
+
+        } catch (IOException e) {
+            showError("Could not read the CSV file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Reads phone numbers from a CSV file. Numbers may be on one line, one per
+     * line, or in any column; cells that are not phone numbers (headers,
+     * names, blanks) are skipped. Duplicates are removed.
+     */
+    private List<String> readNumbersFromCsv(File file) throws IOException {
+        List<String> found = new ArrayList<>();
+        Set<String> seenDigits = new HashSet<>();
+
+        for (String line : Files.readAllLines(
+                file.toPath(), StandardCharsets.UTF_8)) {
+
+            // Remove a byte-order mark that some spreadsheet apps add.
+            line = line.replace("\uFEFF", "");
+
+            for (String cell : line.split("[,;]")) {
+                // Trim whitespace and surrounding quotes from the cell.
+                String number = cell.trim().replaceAll("^\"|\"$", "").trim();
+
+                if (number.matches(PHONE_PATTERN)
+                        && seenDigits.add(digitsOf(number))) {
+                    found.add(number);
+                }
+            }
+        }
+        return found;
     }
 
     /** Returns an error message, or null when both values are valid. */
